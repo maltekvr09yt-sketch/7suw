@@ -8,18 +8,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
-      # ============================================================
-      # CHECKOUT
-      # ============================================================
-
       - name: Checkout
         uses: actions/checkout@v4
-
-
-      # ============================================================
-      # JAVA 21
-      # ============================================================
 
       - name: Setup Java 21
         uses: actions/setup-java@v5
@@ -27,27 +17,21 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-
       # ============================================================
       # PAPER
       # ============================================================
 
       - name: Create Paper project
         run: |
-
           mkdir -p paper/src/main/java/pl/reniferek/servertp
           mkdir -p paper/src/main/resources
 
           cat > paper/pom.xml <<'EOF'
           <?xml version="1.0" encoding="UTF-8"?>
-
           <project xmlns="http://maven.apache.org/POM/4.0.0"
                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-                   https://maven.apache.org/xsd/maven-4.0.0.xsd">
-
+                   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
               <modelVersion>4.0.0</modelVersion>
-
               <groupId>pl.reniferek</groupId>
               <artifactId>ServerTeleport-Paper</artifactId>
               <version>1.0.0</version>
@@ -75,30 +59,18 @@ jobs:
 
               <build>
                   <plugins>
-
                       <plugin>
                           <groupId>org.apache.maven.plugins</groupId>
                           <artifactId>maven-compiler-plugin</artifactId>
                           <version>3.13.0</version>
-
                           <configuration>
                               <release>21</release>
                           </configuration>
                       </plugin>
-
                   </plugins>
               </build>
-
           </project>
           EOF
-
-
-      # ============================================================
-      # PAPER plugin.yml
-      # ============================================================
-
-      - name: Create Paper plugin.yml
-        run: |
 
           cat > paper/src/main/resources/plugin.yml <<'EOF'
           name: ServerTeleport
@@ -107,25 +79,8 @@ jobs:
           api-version: '1.21'
           EOF
 
-
-      # ============================================================
-      # PAPER config.yml
-      # ============================================================
-
-      - name: Create Paper config.yml
-        run: |
-
           cat > paper/src/main/resources/config.yml <<'EOF'
-
-          # ==========================================================
-          # SERVER TELEPORT
-          # ==========================================================
-
           server: "LifeStealSMPspawn"
-
-          # ==========================================================
-          # STREFA
-          # ==========================================================
 
           min-x: -4
           max-x: 4
@@ -135,32 +90,14 @@ jobs:
 
           z: 9
 
-          # Czy gracz musi stac w powietrzu?
           require-air: false
-
-          # Tylko jedno wykrycie podczas jednego wejscia
           once-per-entry: true
 
-          # ==========================================================
-          # WIADOMOSCI
-          # ==========================================================
-
           message-blocked: "&cAktualnie server jest zablokowany."
-
           message-offline: "&cAktualnie server jest wyłączony."
-
           EOF
 
-
-      # ============================================================
-      # PAPER JAVA
-      # ============================================================
-
-      - name: Create Paper Java
-        run: |
-
           cat > paper/src/main/java/pl/reniferek/servertp/ServerTeleport.java <<'EOF'
-
           package pl.reniferek.servertp;
 
           import org.bukkit.Location;
@@ -180,255 +117,93 @@ jobs:
 
           public class ServerTeleport extends JavaPlugin implements Listener {
 
-              private static final String CHANNEL =
-                      "serverteleport:main";
-
-              private final Set<UUID> playersInRegion =
-                      new HashSet<>();
-
+              private static final String CHANNEL = "serverteleport:main";
+              private final Set<UUID> playersInRegion = new HashSet<>();
 
               @Override
               public void onEnable() {
-
                   saveDefaultConfig();
 
-                  getServer()
-                          .getMessenger()
-                          .registerOutgoingPluginChannel(
-                                  this,
-                                  CHANNEL
-                          );
+                  getServer().getMessenger().registerOutgoingPluginChannel(this, CHANNEL);
+                  getServer().getPluginManager().registerEvents(this, this);
 
-                  getServer()
-                          .getPluginManager()
-                          .registerEvents(
-                                  this,
-                                  this
-                          );
-
-                  getLogger().info(
-                          "================================"
-                  );
-
-                  getLogger().info(
-                          "ServerTeleport Paper WLACZONY"
-                  );
-
-                  getLogger().info(
-                          "Plugin Messaging WLACZONE"
-                  );
-
-                  getLogger().info(
-                          "Serwer: "
-                                  + getConfig().getString(
-                                          "server",
-                                          "LifeStealSMPspawn"
-                                  )
-                  );
-
-                  getLogger().info(
-                          "================================"
-                  );
+                  getLogger().info("ServerTeleport Paper wlaczony.");
+                  getLogger().info("Serwer docelowy: " +
+                          getConfig().getString("server", "LifeStealSMPspawn"));
               }
-
 
               @Override
               public void onDisable() {
-
-                  getServer()
-                          .getMessenger()
-                          .unregisterOutgoingPluginChannel(
-                                  this,
-                                  CHANNEL
-                          );
-
+                  getServer().getMessenger().unregisterOutgoingPluginChannel(this, CHANNEL);
                   playersInRegion.clear();
               }
 
-
-              // =====================================================
-              // WYKRYWANIE REGIONU
-              // =====================================================
-
               @EventHandler
-              public void onMove(
-                      PlayerMoveEvent event
-              ) {
-
+              public void onMove(PlayerMoveEvent event) {
                   if (event.getTo() == null) {
                       return;
                   }
 
-                  Player player =
-                          event.getPlayer();
+                  Player player = event.getPlayer();
+                  Location location = event.getTo();
+                  UUID uuid = player.getUniqueId();
 
-                  Location location =
-                          event.getTo();
-
-                  UUID uuid =
-                          player.getUniqueId();
-
-                  boolean inside =
-                          isInsideRegion(
-                                  player,
-                                  location
-                          );
-
+                  boolean inside = isInsideRegion(location);
 
                   if (inside) {
-
-                      if (
-                          getConfig().getBoolean(
-                                  "once-per-entry",
-                                  true
-                          )
-                          &&
-                          playersInRegion.contains(
-                                  uuid
-                          )
-                      ) {
+                      if (getConfig().getBoolean("once-per-entry", true)
+                              && playersInRegion.contains(uuid)) {
                           return;
                       }
 
-
-                      playersInRegion.add(
-                              uuid
-                      );
-
-
-                      askVelocityToConnect(
-                              player
-                      );
-
+                      playersInRegion.add(uuid);
+                      askVelocityToConnect(player);
                   } else {
-
-                      playersInRegion.remove(
-                              uuid
-                      );
+                      playersInRegion.remove(uuid);
                   }
               }
 
+              private boolean isInsideRegion(Location location) {
+                  int x = location.getBlockX();
+                  int y = location.getBlockY();
+                  int z = location.getBlockZ();
 
-              // =====================================================
-              // SPRAWDZANIE REGIONU
-              // =====================================================
+                  int minX = getConfig().getInt("min-x");
+                  int maxX = getConfig().getInt("max-x");
+                  int minY = getConfig().getInt("min-y");
+                  int maxY = getConfig().getInt("max-y");
+                  int requiredZ = getConfig().getInt("z");
 
-              private boolean isInsideRegion(
-                      Player player,
-                      Location location
-              ) {
-
-                  int x =
-                          location.getBlockX();
-
-                  int y =
-                          location.getBlockY();
-
-                  int z =
-                          location.getBlockZ();
-
-
-                  int minX =
-                          getConfig().getInt(
-                                  "min-x"
-                          );
-
-                  int maxX =
-                          getConfig().getInt(
-                                  "max-x"
-                          );
-
-                  int minY =
-                          getConfig().getInt(
-                                  "min-y"
-                          );
-
-                  int maxY =
-                          getConfig().getInt(
-                                  "max-y"
-                          );
-
-                  int requiredZ =
-                          getConfig().getInt(
-                                  "z"
-                          );
-
-
-                  if (
-                      x < minX ||
-                      x > maxX
-                  ) {
+                  if (x < minX || x > maxX) {
                       return false;
                   }
 
-
-                  if (
-                      y < minY ||
-                      y > maxY
-                  ) {
+                  if (y < minY || y > maxY) {
                       return false;
                   }
 
-
-                  if (
-                      z != requiredZ
-                  ) {
+                  if (z != requiredZ) {
                       return false;
                   }
 
-
-                  if (
-                      getConfig().getBoolean(
-                              "require-air",
-                              false
-                      )
-                  ) {
-
-                      if (
-                          !location
-                                  .getBlock()
-                                  .isEmpty()
-                      ) {
-                          return false;
-                      }
+                  if (getConfig().getBoolean("require-air", false)
+                          && !location.getBlock().isEmpty()) {
+                      return false;
                   }
-
 
                   return true;
               }
 
-
-              // =====================================================
-              // WYSŁANIE DO VELOCITY
-              // =====================================================
-
-              private void askVelocityToConnect(
-                      Player player
-              ) {
-
+              private void askVelocityToConnect(Player player) {
                   try {
+                      ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+                      DataOutputStream out = new DataOutputStream(bytes);
 
-                      ByteArrayOutputStream bytes =
-                              new ByteArrayOutputStream();
-
-                      DataOutputStream out =
-                              new DataOutputStream(
-                                      bytes
-                              );
-
-
-                      out.writeUTF(
-                              "CHECK"
-                      );
-
-
-                      out.writeUTF(
-                              getConfig().getString(
-                                      "server",
-                                      "LifeStealSMPspawn"
-                              )
-                      );
-
+                      out.writeUTF("CHECK");
+                      out.writeUTF(getConfig().getString(
+                              "server",
+                              "LifeStealSMPspawn"
+                      ));
 
                       player.sendPluginMessage(
                               this,
@@ -436,39 +211,21 @@ jobs:
                               bytes.toByteArray()
                       );
 
-
                       out.close();
                       bytes.close();
-
-
                   } catch (IOException e) {
-
                       getLogger().severe(
-                              "Blad Plugin Messaging: "
-                                      + e.getMessage()
+                              "Blad Plugin Messaging: " + e.getMessage()
                       );
                   }
               }
 
-
-              // =====================================================
-              // WYJSCIE GRACZA
-              // =====================================================
-
               @EventHandler
-              public void onQuit(
-                      PlayerQuitEvent event
-              ) {
-
-                  playersInRegion.remove(
-                          event.getPlayer()
-                                  .getUniqueId()
-                  );
+              public void onQuit(PlayerQuitEvent event) {
+                  playersInRegion.remove(event.getPlayer().getUniqueId());
               }
           }
-
           EOF
-
 
       # ============================================================
       # VELOCITY
@@ -476,20 +233,15 @@ jobs:
 
       - name: Create Velocity project
         run: |
-
           mkdir -p velocity/src/main/java/pl/reniferek/servertp
           mkdir -p velocity/src/main/resources
 
           cat > velocity/pom.xml <<'EOF'
           <?xml version="1.0" encoding="UTF-8"?>
-
           <project xmlns="http://maven.apache.org/POM/4.0.0"
                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-                   https://maven.apache.org/xsd/maven-4.0.0.xsd">
-
+                   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
               <modelVersion>4.0.0</modelVersion>
-
               <groupId>pl.reniferek</groupId>
               <artifactId>ServerTeleport-Velocity</artifactId>
               <version>1.0.0</version>
@@ -507,94 +259,59 @@ jobs:
               </repositories>
 
               <dependencies>
-
                   <dependency>
                       <groupId>com.velocitypowered</groupId>
                       <artifactId>velocity-api</artifactId>
                       <version>3.4.0-SNAPSHOT</version>
                       <scope>provided</scope>
                   </dependency>
-
               </dependencies>
 
               <build>
-
                   <plugins>
-
                       <plugin>
                           <groupId>org.apache.maven.plugins</groupId>
                           <artifactId>maven-compiler-plugin</artifactId>
                           <version>3.13.0</version>
-
                           <configuration>
                               <release>21</release>
                           </configuration>
                       </plugin>
-
-
-                      <plugin>
-                          <groupId>org.apache.maven.plugins</groupId>
-                          <artifactId>maven-shade-plugin</artifactId>
-                          <version>3.6.0</version>
-
-                          <executions>
-
-                              <execution>
-
-                                  <phase>package</phase>
-
-                                  <goals>
-                                      <goal>shade</goal>
-                                  </goals>
-
-                              </execution>
-
-                          </executions>
-                      </plugin>
-
                   </plugins>
-
               </build>
-
           </project>
           EOF
 
-
-      # ============================================================
-      # VELOCITY JAVA
-      # ============================================================
-
-      - name: Create Velocity Java
-        run: |
+          cat > velocity/src/main/resources/velocity-plugin.json <<'EOF'
+          {
+            "id": "serverteleport",
+            "name": "ServerTeleport",
+            "version": "1.0.0",
+            "description": "ServerTeleport for LifeStealSMP",
+            "authors": ["Reniferek"],
+            "main": "pl.reniferek.servertp.ServerTeleportVelocity"
+          }
+          EOF
 
           cat > velocity/src/main/java/pl/reniferek/servertp/ServerTeleportVelocity.java <<'EOF'
-
           package pl.reniferek.servertp;
 
           import com.google.inject.Inject;
-
           import com.velocitypowered.api.command.SimpleCommand;
-
           import com.velocitypowered.api.event.Subscribe;
           import com.velocitypowered.api.event.connection.PluginMessageEvent;
           import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
-
           import com.velocitypowered.api.plugin.Plugin;
-
           import com.velocitypowered.api.proxy.Player;
           import com.velocitypowered.api.proxy.ProxyServer;
-
           import com.velocitypowered.api.proxy.messages.MinecraftChannelIdentifier;
-
           import com.velocitypowered.api.proxy.server.RegisteredServer;
           import com.velocitypowered.api.proxy.server.ServerConnection;
 
           import net.kyori.adventure.key.Key;
           import net.kyori.adventure.sound.Sound;
-
           import net.kyori.adventure.text.Component;
           import net.kyori.adventure.text.format.NamedTextColor;
-
           import net.kyori.adventure.title.Title;
 
           import org.slf4j.Logger;
@@ -602,15 +319,11 @@ jobs:
           import java.io.ByteArrayInputStream;
           import java.io.DataInputStream;
           import java.io.IOException;
-
           import java.nio.file.Files;
           import java.nio.file.Path;
-
           import java.time.Duration;
-
           import java.util.Optional;
           import java.util.Properties;
-
 
           @Plugin(
                   id = "serverteleport",
@@ -618,28 +331,16 @@ jobs:
                   version = "1.0.0",
                   authors = {"Reniferek"}
           )
-
           public class ServerTeleportVelocity {
 
-
-              private static final String CHANNEL =
-                      "serverteleport:main";
-
+              private static final String CHANNEL = "serverteleport:main";
 
               private final ProxyServer proxy;
-
               private final Logger logger;
-
               private final Path dataDirectory;
 
               private Path configFile;
-
               private boolean blockade = true;
-
-
-              // =====================================================
-              // KONSTRUKTOR
-              // =====================================================
 
               @Inject
               public ServerTeleportVelocity(
@@ -647,783 +348,332 @@ jobs:
                       Logger logger,
                       Path dataDirectory
               ) {
-
-                  this.proxy =
-                          proxy;
-
-                  this.logger =
-                          logger;
-
-                  this.dataDirectory =
-                          dataDirectory;
+                  this.proxy = proxy;
+                  this.logger = logger;
+                  this.dataDirectory = dataDirectory;
               }
 
-
-              // =====================================================
-              // START VELOCITY
-              // =====================================================
-
               @Subscribe
-              public void onProxyInitialization(
-                      ProxyInitializeEvent event
-              ) {
-
+              public void onProxyInitialization(ProxyInitializeEvent event) {
                   try {
+                      Files.createDirectories(dataDirectory);
 
-                      Files.createDirectories(
-                              dataDirectory
-                      );
-
-
-                      configFile =
-                              dataDirectory.resolve(
-                                      "config.properties"
-                              );
-
+                      configFile = dataDirectory.resolve("config.properties");
 
                       loadConfig();
-
-
                   } catch (IOException e) {
-
-                      logger.error(
-                              "Nie mozna utworzyc konfiguracji.",
-                              e
-                      );
+                      logger.error("Nie mozna utworzyc konfiguracji.", e);
                   }
 
-
-                  // -------------------------------------------------
-                  // KANAL
-                  // -------------------------------------------------
-
-                  proxy.getChannelRegistrar()
-                          .register(
-                                  MinecraftChannelIdentifier.from(
-                                          CHANNEL
-                                  )
-                          );
-
-
-                  // -------------------------------------------------
-                  // KOMENDA BLOKADY
-                  // -------------------------------------------------
-
-                  proxy.getCommandManager()
-                          .register(
-
-                                  proxy.getCommandManager()
-                                          .metaBuilder(
-                                                  "blokadaLifeStealSMP"
-                                          )
-                                          .plugin(this)
-                                          .build(),
-
-                                  new BlockadeCommand()
-                          );
-
-
-                  // -------------------------------------------------
-                  // KOMENDA STATUSU
-                  // -------------------------------------------------
-
-                  proxy.getCommandManager()
-                          .register(
-
-                                  proxy.getCommandManager()
-                                          .metaBuilder(
-                                                  "statusLifeStealSMP"
-                                          )
-                                          .plugin(this)
-                                          .build(),
-
-                                  new StatusCommand()
-                          );
-
-
-                  logger.info(
-                          "================================"
+                  proxy.getChannelRegistrar().register(
+                          MinecraftChannelIdentifier.from(CHANNEL)
                   );
 
-                  logger.info(
-                          "ServerTeleport Velocity WLACZONY"
+                  proxy.getCommandManager().register(
+                          proxy.getCommandManager()
+                                  .metaBuilder("blokadaLifeStealSMP")
+                                  .plugin(this)
+                                  .build(),
+                          new BlockadeCommand()
                   );
 
-                  logger.info(
-                          "Blokada: "
-                                  +
-                                  (
-                                      blockade
-                                              ? "ON"
-                                              : "OFF"
-                                  )
+                  proxy.getCommandManager().register(
+                          proxy.getCommandManager()
+                                  .metaBuilder("statusLifeStealSMP")
+                                  .plugin(this)
+                                  .build(),
+                          new StatusCommand()
                   );
 
-                  logger.info(
-                          "================================"
-                  );
+                  logger.info("ServerTeleport Velocity wlaczony.");
+                  logger.info("Status blokady: " +
+                          (blockade ? "ODBLOKOWANE" : "ZABLOKOWANE"));
               }
 
+              private void loadConfig() throws IOException {
+                  Properties properties = new Properties();
 
-              // =====================================================
-              // WCZYTYWANIE CONFIG
-              // =====================================================
+                  if (!Files.exists(configFile)) {
+                      properties.setProperty("blockade", "true");
 
-              private void loadConfig()
-                      throws IOException {
-
-                  Properties properties =
-                          new Properties();
-
-
-                  if (
-                      !Files.exists(
-                              configFile
-                      )
-                  ) {
-
-                      properties.setProperty(
-                              "blockade",
-                              "true"
-                      );
-
-
-                      try (
-                          var writer =
-                                  Files.newBufferedWriter(
-                                          configFile
-                                  )
-                      ) {
-
-                          properties.store(
-                                  writer,
-                                  "ServerTeleport"
-                          );
+                      try (var writer = Files.newBufferedWriter(configFile)) {
+                          properties.store(writer, "ServerTeleport");
                       }
 
-
-                      blockade =
-                              true;
-
+                      blockade = true;
                       return;
                   }
 
-
-                  try (
-                      var reader =
-                              Files.newBufferedReader(
-                                      configFile
-                              )
-                  ) {
-
-                      properties.load(
-                              reader
-                      );
+                  try (var reader = Files.newBufferedReader(configFile)) {
+                      properties.load(reader);
                   }
 
-
-                  blockade =
-                          Boolean.parseBoolean(
-                                  properties.getProperty(
-                                          "blockade",
-                                          "true"
-                                  )
-                          );
+                  blockade = Boolean.parseBoolean(
+                          properties.getProperty("blockade", "true")
+                  );
               }
-
-
-              // =====================================================
-              // ZAPIS CONFIG
-              // =====================================================
 
               private void saveConfig() {
-
                   try {
-
-                      Properties properties =
-                              new Properties();
-
-
+                      Properties properties = new Properties();
                       properties.setProperty(
                               "blockade",
-                              Boolean.toString(
-                                      blockade
-                              )
+                              Boolean.toString(blockade)
                       );
 
-
-                      try (
-                          var writer =
-                                  Files.newBufferedWriter(
-                                          configFile
-                                  )
-                      ) {
-
-                          properties.store(
-                                  writer,
-                                  "ServerTeleport"
-                          );
+                      try (var writer = Files.newBufferedWriter(configFile)) {
+                          properties.store(writer, "ServerTeleport");
                       }
-
-
                   } catch (IOException e) {
-
-                      logger.error(
-                              "Nie mozna zapisac konfiguracji.",
-                              e
-                      );
+                      logger.error("Nie mozna zapisac konfiguracji.", e);
                   }
               }
 
-
-              // =====================================================
-              // PLUGIN MESSAGING
-              // =====================================================
-
               @Subscribe
-              public void onPluginMessage(
-                      PluginMessageEvent event
-              ) {
-
-                  if (
-                      !event.getIdentifier()
-                              .getId()
-                              .equalsIgnoreCase(
-                                      CHANNEL
-                              )
-                  ) {
+              public void onPluginMessage(PluginMessageEvent event) {
+                  if (!event.getIdentifier().getId().equalsIgnoreCase(CHANNEL)) {
                       return;
                   }
-
 
                   event.setResult(
-                          PluginMessageEvent
-                                  .ForwardResult
-                                  .handled()
+                          PluginMessageEvent.ForwardResult.handled()
                   );
 
-
-                  if (
-                      !(
-                          event.getSource()
-                                  instanceof ServerConnection connection
-                      )
-                  ) {
+                  if (!(event.getSource() instanceof ServerConnection connection)) {
                       return;
                   }
 
-
-                  Player player =
-                          connection.getPlayer();
-
+                  Player player = connection.getPlayer();
 
                   try {
+                      DataInputStream in = new DataInputStream(
+                              new ByteArrayInputStream(event.getData())
+                      );
 
-                      DataInputStream in =
-                              new DataInputStream(
-                                      new ByteArrayInputStream(
-                                              event.getData()
-                                      )
-                              );
+                      String action = in.readUTF();
 
-
-                      String action =
-                              in.readUTF();
-
-
-                      if (
-                          !action.equalsIgnoreCase(
-                                  "CHECK"
-                          )
-                      ) {
+                      if (!action.equalsIgnoreCase("CHECK")) {
                           return;
                       }
 
+                      String serverName = in.readUTF();
 
-                      String serverName =
-                              in.readUTF();
-
-
-                      checkServerAndConnect(
-                              player,
-                              serverName
-                      );
-
-
+                      checkServerAndConnect(player, serverName);
                   } catch (IOException e) {
-
-                      logger.error(
-                              "Blad Plugin Messaging.",
-                              e
-                      );
+                      logger.error("Blad Plugin Messaging.", e);
                   }
               }
-
-
-              // =====================================================
-              // SPRAWDZANIE SERWERA
-              // =====================================================
 
               private void checkServerAndConnect(
                       Player player,
                       String serverName
               ) {
-
-
-                  // -------------------------------------------------
-                  // BLOKADA
-                  // -------------------------------------------------
-
                   if (!blockade) {
-
                       player.sendMessage(
                               Component.text(
                                       "Aktualnie server jest zablokowany."
-                              ).color(
-                                      NamedTextColor.RED
-                              )
+                              ).color(NamedTextColor.RED)
                       );
-
                       return;
                   }
 
-
-                  // -------------------------------------------------
-                  // SZUKANIE SERWERA
-                  // -------------------------------------------------
-
                   Optional<RegisteredServer> optionalServer =
-                          proxy.getServer(
-                                  serverName
-                          );
+                          proxy.getServer(serverName);
 
-
-                  if (
-                      optionalServer.isEmpty()
-                  ) {
-
+                  if (optionalServer.isEmpty()) {
                       player.sendMessage(
                               Component.text(
                                       "Aktualnie server jest wyłączony."
-                              ).color(
-                                      NamedTextColor.RED
-                              )
+                              ).color(NamedTextColor.RED)
                       );
-
                       return;
                   }
 
+                  RegisteredServer server = optionalServer.get();
 
-                  RegisteredServer server =
-                          optionalServer.get();
-
-
-                  // -------------------------------------------------
-                  // PING SERWERA
-                  // -------------------------------------------------
-
-                  server.ping()
-                          .whenComplete(
-                                  (ping, error) -> {
-
-
-                                      if (
-                                          error != null
-                                      ) {
-
-                                          player.sendMessage(
-                                                  Component.text(
-                                                          "Aktualnie server jest wyłączony."
-                                                  ).color(
-                                                          NamedTextColor.RED
-                                                  )
-                                          );
-
-                                          logger.info(
-                                                  "LifeStealSMPspawn OFFLINE."
-                                          );
-
-                                          return;
-                                      }
-
-
-                                      // --------------------------------
-                                      // SERWER DZIALA
-                                      // --------------------------------
-
-                                      showConnectingTitle(
-                                              player
-                                      );
-
-
-                                      logger.info(
-                                              player.getUsername()
-                                                      + " laczy sie z "
-                                                      + serverName
-                                      );
-
-
-                                      server
-                                              .createConnectionRequest(
-                                                      player
-                                              )
-                                              .connect()
-                                              .exceptionally(
-                                                      connectionError -> {
-
-                                                          player.sendMessage(
-                                                                  Component.text(
-                                                                          "Nie udało się połączyć z serwerem."
-                                                                  ).color(
-                                                                          NamedTextColor.RED
-                                                                  )
-                                                          );
-
-
-                                                          logger.error(
-                                                                  "Blad polaczenia "
-                                                                          + player.getUsername(),
-                                                                  connectionError
-                                                          );
-
-
-                                                          return null;
-                                                      }
-                                              );
-                                  }
-                          );
-              }
-
-
-              // =====================================================
-              // TYTUL LACZENIA
-              // =====================================================
-
-              private void showConnectingTitle(
-                      Player player
-              ) {
-
-                  Title.Times times =
-                          Title.Times.times(
-                                  Duration.ofMillis(
-                                          200
-                                  ),
-
-                                  Duration.ofSeconds(
-                                          3
-                                  ),
-
-                                  Duration.ofMillis(
-                                          300
-                                  )
-                          );
-
-
-                  Title title =
-                          Title.title(
-
+                  server.ping().whenComplete((ping, error) -> {
+                      if (error != null) {
+                          player.sendMessage(
                                   Component.text(
-                                          "Łączenie z serwerem..."
-                                  ).color(
-                                          NamedTextColor.YELLOW
-                                  ),
-
-                                  Component.empty(),
-
-                                  times
+                                          "Aktualnie server jest wyłączony."
+                                  ).color(NamedTextColor.RED)
                           );
+                          return;
+                      }
 
+                      showConnectingTitle(player);
 
-                  player.showTitle(
-                          title
-                  );
+                      server.createConnectionRequest(player)
+                              .connect()
+                              .exceptionally(connectionError -> {
+                                  player.sendMessage(
+                                          Component.text(
+                                                  "Nie udało się połączyć z serwerem."
+                                          ).color(NamedTextColor.RED)
+                                  );
+
+                                  logger.error(
+                                          "Blad polaczenia " +
+                                                  player.getUsername(),
+                                          connectionError
+                                  );
+
+                                  return null;
+                              });
+                  });
               }
 
+              private void showConnectingTitle(Player player) {
+                  Title.Times times = Title.Times.times(
+                          Duration.ofMillis(200),
+                          Duration.ofSeconds(3),
+                          Duration.ofMillis(300)
+                  );
 
-              // =====================================================
-              // DZWIEK ON
-              // =====================================================
+                  Title title = Title.title(
+                          Component.text(
+                                  "Łączenie z serwerem..."
+                          ).color(NamedTextColor.YELLOW),
+                          Component.empty(),
+                          times
+                  );
 
-              private void playOnSound(
-                      Player player
-              ) {
+                  player.showTitle(title);
+              }
 
+              private void playOnSound(Player player) {
                   player.playSound(
-
                           Sound.sound(
-
-                                  Key.key(
-                                          "block.note_block.bell"
-                                  ),
-
+                                  Key.key("block.note_block.bell"),
                                   Sound.Source.MASTER,
-
                                   1.0f,
-
                                   1.2f
                           )
                   );
               }
 
-
-              // =====================================================
-              // DZWIEK OFF
-              // =====================================================
-
-              private void playOffSound(
-                      Player player
-              ) {
-
+              private void playOffSound(Player player) {
                   player.playSound(
-
                           Sound.sound(
-
-                                  Key.key(
-                                          "block.anvil.land"
-                                  ),
-
+                                  Key.key("block.anvil.land"),
                                   Sound.Source.MASTER,
-
                                   0.7f,
-
                                   0.8f
                           )
                   );
               }
 
-
-              // =====================================================
-              // KOMENDA BLOKADY
-              // =====================================================
-
-              private class BlockadeCommand
-                      implements SimpleCommand {
-
+              private class BlockadeCommand implements SimpleCommand {
 
                   @Override
-                  public void execute(
-                          Invocation invocation
-                  ) {
+                  public void execute(Invocation invocation) {
+                      String[] args = invocation.arguments();
 
-                      String[] args =
-                              invocation.arguments();
-
-
-                      if (
-                          args.length != 1
-                      ) {
-
-                          invocation.source()
-                                  .sendMessage(
-                                          Component.text(
-                                                  "Użycie: /blokadaLifeStealSMP on/off"
-                                          ).color(
-                                                  NamedTextColor.YELLOW
-                                          )
-                                  );
-
+                      if (args.length != 1) {
+                          invocation.source().sendMessage(
+                                  Component.text(
+                                          "Użycie: /blokadaLifeStealSMP on/off"
+                                  ).color(NamedTextColor.YELLOW)
+                          );
                           return;
                       }
 
-
-                      // ---------------------------------------------
-                      // ON
-                      // ---------------------------------------------
-
-                      if (
-                          args[0].equalsIgnoreCase(
-                                  "on"
-                          )
-                      ) {
-
-                          blockade =
-                                  true;
-
-
+                      if (args[0].equalsIgnoreCase("on")) {
+                          blockade = true;
                           saveConfig();
 
-
-                          invocation.source()
-                                  .sendMessage(
-                                          Component.text(
-                                                  "LifeStealSMP jest teraz ODBLOKOWANY."
-                                          ).color(
-                                                  NamedTextColor.GREEN
-                                          )
-                                  );
-
-
-                          if (
-                              invocation.source()
-                                      instanceof Player player
-                          ) {
-
-                              playOnSound(
-                                      player
-                              );
-                          }
-
-
-                          logger.info(
-                                  "LifeStealSMP: ON"
+                          invocation.source().sendMessage(
+                                  Component.text(
+                                          "LifeStealSMP jest teraz ODBLOKOWANY."
+                                  ).color(NamedTextColor.GREEN)
                           );
 
+                          if (invocation.source() instanceof Player player) {
+                              playOnSound(player);
+                          }
 
                           return;
                       }
 
-
-                      // ---------------------------------------------
-                      // OFF
-                      // ---------------------------------------------
-
-                      if (
-                          args[0].equalsIgnoreCase(
-                                  "off"
-                          )
-                      ) {
-
-                          blockade =
-                                  false;
-
-
+                      if (args[0].equalsIgnoreCase("off")) {
+                          blockade = false;
                           saveConfig();
 
-
-                          invocation.source()
-                                  .sendMessage(
-                                          Component.text(
-                                                  "LifeStealSMP jest teraz ZABLOKOWANY."
-                                          ).color(
-                                                  NamedTextColor.RED
-                                          )
-                                  );
-
-
-                          if (
-                              invocation.source()
-                                      instanceof Player player
-                          ) {
-
-                              playOffSound(
-                                      player
-                              );
-                          }
-
-
-                          logger.info(
-                                  "LifeStealSMP: OFF"
+                          invocation.source().sendMessage(
+                                  Component.text(
+                                          "LifeStealSMP jest teraz ZABLOKOWANY."
+                                  ).color(NamedTextColor.RED)
                           );
 
+                          if (invocation.source() instanceof Player player) {
+                              playOffSound(player);
+                          }
 
                           return;
                       }
 
-
-                      invocation.source()
-                              .sendMessage(
-                                      Component.text(
-                                              "Użycie: /blokadaLifeStealSMP on/off"
-                                      ).color(
-                                              NamedTextColor.YELLOW
-                                      )
-                              );
+                      invocation.source().sendMessage(
+                              Component.text(
+                                      "Użycie: /blokadaLifeStealSMP on/off"
+                              ).color(NamedTextColor.YELLOW)
+                      );
                   }
 
-
                   @Override
-                  public boolean hasPermission(
-                          Invocation invocation
-                  ) {
-
-                      return invocation.source()
-                              .hasPermission(
-                                      "serverteleport.blockade"
-                              );
+                  public boolean hasPermission(Invocation invocation) {
+                      return invocation.source().hasPermission(
+                              "serverteleport.blockade"
+                      );
                   }
               }
 
-
-              // =====================================================
-              // KOMENDA STATUSU
-              // =====================================================
-
-              private class StatusCommand
-                      implements SimpleCommand {
-
+              private class StatusCommand implements SimpleCommand {
 
                   @Override
-                  public void execute(
-                          Invocation invocation
-                  ) {
-
+                  public void execute(Invocation invocation) {
                       if (blockade) {
-
-                          invocation.source()
-                                  .sendMessage(
-                                          Component.text(
-                                                  "Status LifeStealSMP: ODBLOKOWANE"
-                                          ).color(
-                                                  NamedTextColor.GREEN
-                                          )
-                                  );
-
+                          invocation.source().sendMessage(
+                                  Component.text(
+                                          "Status LifeStealSMP: ODBLOKOWANE"
+                                  ).color(NamedTextColor.GREEN)
+                          );
                       } else {
-
-                          invocation.source()
-                                  .sendMessage(
-                                          Component.text(
-                                                  "Status LifeStealSMP: ZABLOKOWANE"
-                                          ).color(
-                                                  NamedTextColor.RED
-                                          )
-                                  );
+                          invocation.source().sendMessage(
+                                  Component.text(
+                                          "Status LifeStealSMP: ZABLOKOWANE"
+                                  ).color(NamedTextColor.RED)
+                          );
+                      }
                   }
 
-
                   @Override
-                  public boolean hasPermission(
-                          Invocation invocation
-                  ) {
-
-                      return invocation.source()
-                              .hasPermission(
-                                      "serverteleport.status"
-                              );
+                  public boolean hasPermission(Invocation invocation) {
+                      return invocation.source().hasPermission(
+                              "serverteleport.status"
+                      );
                   }
               }
           }
-
           EOF
 
-
       # ============================================================
-      # BUILD PAPER
+      # BUILD
       # ============================================================
 
       - name: Build Paper
         working-directory: paper
-        run: |
-          mvn clean package
-
-
-      # ============================================================
-      # BUILD VELOCITY
-      # ============================================================
+        run: mvn clean package
 
       - name: Build Velocity
         working-directory: velocity
-        run: |
-          mvn clean package
-
+        run: mvn clean package
 
       # ============================================================
-      # PRZYGOTOWANIE JAR
+      # OUTPUT
       # ============================================================
 
       - name: Prepare JAR files
         run: |
-
           mkdir -p output
 
           cp paper/target/ServerTeleport-Paper-1.0.0.jar \
@@ -1431,11 +681,6 @@ jobs:
 
           cp velocity/target/ServerTeleport-Velocity-1.0.0.jar \
              output/ServerTeleport-Velocity.jar
-
-
-      # ============================================================
-      # UPLOAD
-      # ============================================================
 
       - name: Upload JAR files
         uses: actions/upload-artifact@v4

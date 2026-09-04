@@ -302,11 +302,12 @@ jobs:
           import com.velocitypowered.api.event.connection.PluginMessageEvent;
           import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
           import com.velocitypowered.api.plugin.Plugin;
+          import com.velocitypowered.api.plugin.annotation.DataDirectory;
           import com.velocitypowered.api.proxy.Player;
           import com.velocitypowered.api.proxy.ProxyServer;
           import com.velocitypowered.api.proxy.messages.MinecraftChannelIdentifier;
           import com.velocitypowered.api.proxy.server.RegisteredServer;
-          import com.velocitypowered.api.proxy.server.ServerConnection;
+          import com.velocitypowered.api.proxy.ServerConnection;
 
           import net.kyori.adventure.key.Key;
           import net.kyori.adventure.sound.Sound;
@@ -346,7 +347,7 @@ jobs:
               public ServerTeleportVelocity(
                       ProxyServer proxy,
                       Logger logger,
-                      Path dataDirectory
+                      @DataDirectory Path dataDirectory
               ) {
                   this.proxy = proxy;
                   this.logger = logger;
@@ -503,7 +504,7 @@ jobs:
 
                       showConnectingTitle(player);
 
-                      server.createConnectionRequest(player)
+                      player.createConnectionRequest(server)
                               .connect()
                               .exceptionally(connectionError -> {
                                   player.sendMessage(

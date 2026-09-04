@@ -121,7 +121,6 @@ jobs:
           # SERVER TELEPORT
           # ==========================================================
 
-          # Dokladna nazwa serwera w Velocity
           server: "LifeStealSMPspawn"
 
           # ==========================================================
@@ -187,6 +186,7 @@ jobs:
               private final Set<UUID> playersInRegion =
                       new HashSet<>();
 
+
               @Override
               public void onEnable() {
 
@@ -231,6 +231,7 @@ jobs:
                   );
               }
 
+
               @Override
               public void onDisable() {
 
@@ -243,6 +244,11 @@ jobs:
 
                   playersInRegion.clear();
               }
+
+
+              // =====================================================
+              // WYKRYWANIE REGIONU
+              // =====================================================
 
               @EventHandler
               public void onMove(
@@ -268,6 +274,7 @@ jobs:
                                   location
                           );
 
+
                   if (inside) {
 
                       if (
@@ -283,15 +290,28 @@ jobs:
                           return;
                       }
 
-                      playersInRegion.add(uuid);
 
-                      askVelocityToConnect(player);
+                      playersInRegion.add(
+                              uuid
+                      );
+
+
+                      askVelocityToConnect(
+                              player
+                      );
 
                   } else {
 
-                      playersInRegion.remove(uuid);
+                      playersInRegion.remove(
+                              uuid
+                      );
                   }
               }
+
+
+              // =====================================================
+              // SPRAWDZANIE REGIONU
+              // =====================================================
 
               private boolean isInsideRegion(
                       Player player,
@@ -307,32 +327,55 @@ jobs:
                   int z =
                           location.getBlockZ();
 
+
                   int minX =
-                          getConfig().getInt("min-x");
+                          getConfig().getInt(
+                                  "min-x"
+                          );
 
                   int maxX =
-                          getConfig().getInt("max-x");
+                          getConfig().getInt(
+                                  "max-x"
+                          );
 
                   int minY =
-                          getConfig().getInt("min-y");
+                          getConfig().getInt(
+                                  "min-y"
+                          );
 
                   int maxY =
-                          getConfig().getInt("max-y");
+                          getConfig().getInt(
+                                  "max-y"
+                          );
 
                   int requiredZ =
-                          getConfig().getInt("z");
+                          getConfig().getInt(
+                                  "z"
+                          );
 
-                  if (x < minX || x > maxX) {
+
+                  if (
+                      x < minX ||
+                      x > maxX
+                  ) {
                       return false;
                   }
 
-                  if (y < minY || y > maxY) {
+
+                  if (
+                      y < minY ||
+                      y > maxY
+                  ) {
                       return false;
                   }
 
-                  if (z != requiredZ) {
+
+                  if (
+                      z != requiredZ
+                  ) {
                       return false;
                   }
+
 
                   if (
                       getConfig().getBoolean(
@@ -350,8 +393,14 @@ jobs:
                       }
                   }
 
+
                   return true;
               }
+
+
+              // =====================================================
+              // WYSŁANIE DO VELOCITY
+              // =====================================================
 
               private void askVelocityToConnect(
                       Player player
@@ -363,9 +412,15 @@ jobs:
                               new ByteArrayOutputStream();
 
                       DataOutputStream out =
-                              new DataOutputStream(bytes);
+                              new DataOutputStream(
+                                      bytes
+                              );
 
-                      out.writeUTF("CHECK");
+
+                      out.writeUTF(
+                              "CHECK"
+                      );
+
 
                       out.writeUTF(
                               getConfig().getString(
@@ -374,14 +429,17 @@ jobs:
                               )
                       );
 
+
                       player.sendPluginMessage(
                               this,
                               CHANNEL,
                               bytes.toByteArray()
                       );
 
+
                       out.close();
                       bytes.close();
+
 
                   } catch (IOException e) {
 
@@ -391,6 +449,11 @@ jobs:
                       );
                   }
               }
+
+
+              // =====================================================
+              // WYJSCIE GRACZA
+              // =====================================================
 
               @EventHandler
               public void onQuit(
@@ -455,6 +518,7 @@ jobs:
               </dependencies>
 
               <build>
+
                   <plugins>
 
                       <plugin>
@@ -467,6 +531,7 @@ jobs:
                           </configuration>
                       </plugin>
 
+
                       <plugin>
                           <groupId>org.apache.maven.plugins</groupId>
                           <artifactId>maven-shade-plugin</artifactId>
@@ -475,6 +540,7 @@ jobs:
                           <executions>
 
                               <execution>
+
                                   <phase>package</phase>
 
                                   <goals>
@@ -487,6 +553,7 @@ jobs:
                       </plugin>
 
                   </plugins>
+
               </build>
 
           </project>
@@ -505,21 +572,29 @@ jobs:
           package pl.reniferek.servertp;
 
           import com.google.inject.Inject;
+
           import com.velocitypowered.api.command.SimpleCommand;
+
           import com.velocitypowered.api.event.Subscribe;
           import com.velocitypowered.api.event.connection.PluginMessageEvent;
           import com.velocitypowered.api.event.proxy.ProxyInitializeEvent;
+
           import com.velocitypowered.api.plugin.Plugin;
+
           import com.velocitypowered.api.proxy.Player;
           import com.velocitypowered.api.proxy.ProxyServer;
+
           import com.velocitypowered.api.proxy.messages.MinecraftChannelIdentifier;
+
           import com.velocitypowered.api.proxy.server.RegisteredServer;
           import com.velocitypowered.api.proxy.server.ServerConnection;
 
           import net.kyori.adventure.key.Key;
           import net.kyori.adventure.sound.Sound;
+
           import net.kyori.adventure.text.Component;
           import net.kyori.adventure.text.format.NamedTextColor;
+
           import net.kyori.adventure.title.Title;
 
           import org.slf4j.Logger;
@@ -527,9 +602,12 @@ jobs:
           import java.io.ByteArrayInputStream;
           import java.io.DataInputStream;
           import java.io.IOException;
+
           import java.nio.file.Files;
           import java.nio.file.Path;
+
           import java.time.Duration;
+
           import java.util.Optional;
           import java.util.Properties;
 
@@ -543,8 +621,10 @@ jobs:
 
           public class ServerTeleportVelocity {
 
+
               private static final String CHANNEL =
                       "serverteleport:main";
+
 
               private final ProxyServer proxy;
 
@@ -557,6 +637,10 @@ jobs:
               private boolean blockade = true;
 
 
+              // =====================================================
+              // KONSTRUKTOR
+              // =====================================================
+
               @Inject
               public ServerTeleportVelocity(
                       ProxyServer proxy,
@@ -564,16 +648,19 @@ jobs:
                       Path dataDirectory
               ) {
 
-                  this.proxy = proxy;
+                  this.proxy =
+                          proxy;
 
-                  this.logger = logger;
+                  this.logger =
+                          logger;
 
-                  this.dataDirectory = dataDirectory;
+                  this.dataDirectory =
+                          dataDirectory;
               }
 
 
               // =====================================================
-              // START
+              // START VELOCITY
               // =====================================================
 
               @Subscribe
@@ -587,12 +674,15 @@ jobs:
                               dataDirectory
                       );
 
+
                       configFile =
                               dataDirectory.resolve(
                                       "config.properties"
                               );
 
+
                       loadConfig();
+
 
                   } catch (IOException e) {
 
@@ -602,6 +692,10 @@ jobs:
                       );
                   }
 
+
+                  // -------------------------------------------------
+                  // KANAL
+                  // -------------------------------------------------
 
                   proxy.getChannelRegistrar()
                           .register(
@@ -657,10 +751,11 @@ jobs:
 
                   logger.info(
                           "Blokada: "
-                                  + (
-                                  blockade
-                                          ? "ON"
-                                          : "OFF"
+                                  +
+                                  (
+                                      blockade
+                                              ? "ON"
+                                              : "OFF"
                                   )
                   );
 
@@ -671,7 +766,7 @@ jobs:
 
 
               // =====================================================
-              // CONFIG
+              // WCZYTYWANIE CONFIG
               // =====================================================
 
               private void loadConfig()
@@ -707,7 +802,8 @@ jobs:
                       }
 
 
-                      blockade = true;
+                      blockade =
+                              true;
 
                       return;
                   }
@@ -720,7 +816,9 @@ jobs:
                               )
                   ) {
 
-                      properties.load(reader);
+                      properties.load(
+                              reader
+                      );
                   }
 
 
@@ -733,6 +831,10 @@ jobs:
                           );
               }
 
+
+              // =====================================================
+              // ZAPIS CONFIG
+              // =====================================================
 
               private void saveConfig() {
 
@@ -762,6 +864,7 @@ jobs:
                                   "ServerTeleport"
                           );
                       }
+
 
                   } catch (IOException e) {
 
@@ -866,6 +969,7 @@ jobs:
                       String serverName
               ) {
 
+
                   // -------------------------------------------------
                   // BLOKADA
                   // -------------------------------------------------
@@ -915,12 +1019,13 @@ jobs:
 
 
                   // -------------------------------------------------
-                  // PING
+                  // PING SERWERA
                   // -------------------------------------------------
 
                   server.ping()
                           .whenComplete(
                                   (ping, error) -> {
+
 
                                       if (
                                           error != null
@@ -974,11 +1079,13 @@ jobs:
                                                                   )
                                                           );
 
+
                                                           logger.error(
                                                                   "Blad polaczenia "
                                                                           + player.getUsername(),
                                                                   connectionError
                                                           );
+
 
                                                           return null;
                                                       }
@@ -989,7 +1096,7 @@ jobs:
 
 
               // =====================================================
-              // TYTUL
+              // TYTUL LACZENIA
               // =====================================================
 
               private void showConnectingTitle(
@@ -998,9 +1105,17 @@ jobs:
 
                   Title.Times times =
                           Title.Times.times(
-                                  Duration.ofMillis(200),
-                                  Duration.ofSeconds(3),
-                                  Duration.ofMillis(300)
+                                  Duration.ofMillis(
+                                          200
+                                  ),
+
+                                  Duration.ofSeconds(
+                                          3
+                                  ),
+
+                                  Duration.ofMillis(
+                                          300
+                                  )
                           );
 
 
@@ -1019,7 +1134,9 @@ jobs:
                           );
 
 
-                  player.showTitle(title);
+                  player.showTitle(
+                          title
+                  );
               }
 
 
@@ -1076,7 +1193,7 @@ jobs:
 
 
               // =====================================================
-              // BLOKADA ON/OFF
+              // KOMENDA BLOKADY
               // =====================================================
 
               private class BlockadeCommand
@@ -1114,10 +1231,14 @@ jobs:
                       // ---------------------------------------------
 
                       if (
-                          args[0].equalsIgnoreCase("on")
+                          args[0].equalsIgnoreCase(
+                                  "on"
+                          )
                       ) {
 
-                          blockade = true;
+                          blockade =
+                                  true;
+
 
                           saveConfig();
 
@@ -1137,13 +1258,16 @@ jobs:
                                       instanceof Player player
                           ) {
 
-                              playOnSound(player);
+                              playOnSound(
+                                      player
+                              );
                           }
 
 
                           logger.info(
                                   "LifeStealSMP: ON"
                           );
+
 
                           return;
                       }
@@ -1154,10 +1278,14 @@ jobs:
                       // ---------------------------------------------
 
                       if (
-                          args[0].equalsIgnoreCase("off")
+                          args[0].equalsIgnoreCase(
+                                  "off"
+                          )
                       ) {
 
-                          blockade = false;
+                          blockade =
+                                  false;
+
 
                           saveConfig();
 
@@ -1177,13 +1305,16 @@ jobs:
                                       instanceof Player player
                           ) {
 
-                              playOffSound(player);
+                              playOffSound(
+                                      player
+                              );
                           }
 
 
                           logger.info(
                                   "LifeStealSMP: OFF"
                           );
+
 
                           return;
                       }
@@ -1214,7 +1345,7 @@ jobs:
 
 
               // =====================================================
-              // STATUS
+              // KOMENDA STATUSU
               // =====================================================
 
               private class StatusCommand
@@ -1287,7 +1418,7 @@ jobs:
 
 
       # ============================================================
-      # OUTPUT
+      # PRZYGOTOWANIE JAR
       # ============================================================
 
       - name: Prepare JAR files

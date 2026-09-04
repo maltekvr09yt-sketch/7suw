@@ -14,7 +14,7 @@ jobs:
       - name: Pobierz kod
         uses: actions/checkout@v4
 
-      - name: Java 21
+      - name: Ustaw Java 21
         uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -62,13 +62,11 @@ jobs:
 
             <build>
               <finalName>ServerTeleport</finalName>
-
               <plugins>
                 <plugin>
                   <groupId>org.apache.maven.plugins</groupId>
                   <artifactId>maven-compiler-plugin</artifactId>
                   <version>3.13.0</version>
-
                   <configuration>
                     <release>21</release>
                   </configuration>
@@ -86,6 +84,27 @@ jobs:
           api-version: '1.21'
           EOF
 
+          cat > src/main/resources/config.yml <<'EOF'
+          # Komenda wykonywana przez gracza po wejściu w obszar.
+          # NIE wpisuj "/" na początku.
+          command: "server LifeStealSMPspawn"
+
+          # Obszar teleportacji
+          min-x: -4
+          max-x: 4
+
+          min-y: 68
+          max-y: 77
+
+          z: 9
+
+          # Czy blok, w którym znajduje się gracz, musi być powietrzem?
+          require-air: true
+
+          # Czy komenda ma być wykonywana tylko raz przy wejściu?
+          once-per-entry: true
+          EOF
+
           cat > src/main/java/pl/reniferek/servertp/ServerTeleport.java <<'EOF'
           package pl.reniferek.servertp;
 
@@ -96,9 +115,6 @@ jobs:
           import org.bukkit.event.player.PlayerMoveEvent;
           import org.bukkit.plugin.java.JavaPlugin;
 
-          import java.io.ByteArrayOutputStream;
-          import java.io.DataOutputStream;
-          import java.io.IOException;
           import java.util.HashSet;
           import java.util.Set;
           import java.util.UUID;
@@ -110,29 +126,22 @@ jobs:
               @Override
               public void onEnable() {
 
+                  saveDefaultConfig();
+
                   getServer().getPluginManager()
                           .registerEvents(this, this);
 
-                  // Kanał komunikacji z Velocity
-                  getServer().getMessenger()
-                          .registerOutgoingPluginChannel(this, "BungeeCord");
-
-                  getLogger().info("====================================");
+                  getLogger().info("================================");
                   getLogger().info("ServerTeleport WLACZONY");
-                  getLogger().info("Obszar:");
-                  getLogger().info("X: -4 do 4");
-                  getLogger().info("Y: 68 do 77");
-                  getLogger().info("Z: 9");
-                  getLogger().info("Komenda/cel: LifeStealSMPspawn");
-                  getLogger().info("====================================");
+                  getLogger().info("Komenda: " + getConfig().getString("command"));
+                  getLogger().info("Obszar: X -4..4");
+                  getLogger().info("Obszar: Y 68..77");
+                  getLogger().info("Obszar: Z = 9");
+                  getLogger().info("================================");
               }
 
               @Override
               public void onDisable() {
-
-                  getServer().getMessenger()
-                          .unregisterOutgoingPluginChannel(this, "BungeeCord");
-
                   playersInside.clear();
               }
 
@@ -144,110 +153,95 @@ jobs:
                   }
 
                   Player player = event.getPlayer();
+                  Location loc = event.getTo();
 
-                  Location location = event.getTo();
+                  int x = loc.getBlockX();
+                  int y = loc.getBlockY();
+                  int z = loc.getBlockZ();
 
-                  int x = location.getBlockX();
-                  int y = location.getBlockY();
-                  int z = location.getBlockZ();
+                  int minX = getConfig().getInt("min-x");
+                  int maxX = getConfig().getInt("max-x");
+
+                  int minY = getConfig().getInt("min-y");
+                  int maxY = getConfig().getInt("max-y");
+
+                  int requiredZ = getConfig().getInt("z");
 
                   boolean inArea =
-                          x >= -4 &&
-                          x <= 4 &&
-                          y >= 68 &&
-                          y <= 77 &&
-                          z == 9;
+                          x >= minX &&
+                          x <= maxX &&
+                          y >= minY &&
+                          y <= maxY &&
+                          z == requiredZ;
 
-                  boolean isAir =
-                          location.getBlock().getType().isAir();
+                  boolean requireAir =
+                          getConfig().getBoolean("require-air", true);
 
-                  boolean entered = inArea && isAir;
+                  if (requireAir) {
+                      inArea = inArea &&
+                              loc.getBlock().getType().isAir();
+                  }
 
                   UUID uuid = player.getUniqueId();
 
-                  /*
-                   * Gracz właśnie wszedł w obszar.
-                   */
-                  if (entered) {
+                  if (inArea) {
 
-                      if (playersInside.add(uuid)) {
+                      boolean alreadyInside =
+                              playersInside.contains(uuid);
 
-                          getLogger().info(
-                                  "GRACZ " +
-                                  player.getName() +
-                                  " WSZEDL DO OBSZARU " +
-                                  "XYZ: " +
-                                  x + " " +
-                                  y + " " +
-                                  z
-                          );
+                      if (!alreadyInside ||
+                              !getConfig().getBoolean("once-per-entry", true)) {
 
-                          /*
-                           * Odpowiednik wykonania:
-                           *
-                           * /server LifeStealSMPspawn
-                           *
-                           * przez gracza.
-                           */
-                          connectPlayer(
-                                  player,
-                                  "LifeStealSMPspawn"
-                          );
+                          playersInside.add(uuid);
+
+                          executeCommand(player);
                       }
 
                   } else {
 
-                      /*
-                       * Gracz wyszedł z obszaru.
-                       * Przy następnym wejściu ponownie zadziała.
-                       */
                       playersInside.remove(uuid);
                   }
               }
 
-              private void connectPlayer(
-                      Player player,
-                      String serverName
-              ) {
+              private void executeCommand(Player player) {
 
-                  try {
+                  String command =
+                          getConfig().getString("command", "");
 
-                      ByteArrayOutputStream byteStream =
-                              new ByteArrayOutputStream();
+                  if (command == null || command.trim().isEmpty()) {
 
-                      DataOutputStream out =
-                              new DataOutputStream(byteStream);
-
-                      /*
-                       * Velocity/BungeeCord:
-                       *
-                       * Connect
-                       * LifeStealSMPspawn
-                       */
-                      out.writeUTF("Connect");
-                      out.writeUTF(serverName);
-                      out.flush();
-
-                      getLogger().info(
-                              "PRZENOSZENIE GRACZA " +
-                              player.getName() +
-                              " -> " +
-                              serverName
+                      getLogger().warning(
+                              "Komenda w config.yml jest pusta!"
                       );
 
-                      player.sendPluginMessage(
-                              this,
-                              "BungeeCord",
-                              byteStream.toByteArray()
-                      );
+                      return;
+                  }
 
-                  } catch (IOException exception) {
+                  command = command.trim();
 
-                      getLogger().severe(
-                              "Nie udalo sie przeniesc gracza " +
-                              player.getName() +
-                              ": " +
-                              exception.getMessage()
+                  if (command.startsWith("/")) {
+                      command = command.substring(1);
+                  }
+
+                  getLogger().info(
+                          "Gracz " +
+                          player.getName() +
+                          " wszedl w obszar."
+                  );
+
+                  getLogger().info(
+                          "Wykonuje jako gracz: /" +
+                          command
+                  );
+
+                  boolean result =
+                          player.performCommand(command);
+
+                  if (!result) {
+
+                      getLogger().warning(
+                              "Komenda nie zostala wykonana poprawnie: /" +
+                              command
                       );
                   }
               }

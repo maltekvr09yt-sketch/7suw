@@ -2,79 +2,78 @@ name: Build ServerTeleport
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Pobierz kod
+
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Ustaw Java 21
-        uses: actions/setup-java@v5
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
+          cache: maven
 
-      - name: Utworz projekt
-        shell: bash
+      - name: Create pom.xml
         run: |
-          set -e
-
-          mkdir -p src/main/java/pl/reniferek/servertp
-          mkdir -p src/main/resources
-
           cat > pom.xml <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
           <project xmlns="http://maven.apache.org/POM/4.0.0"
                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-            <modelVersion>4.0.0</modelVersion>
+                   xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                   https://maven.apache.org/xsd/maven-4.0.0.xsd">
 
-            <groupId>pl.reniferek</groupId>
-            <artifactId>ServerTeleport</artifactId>
-            <version>1.0.0</version>
+              <modelVersion>4.0.0</modelVersion>
 
-            <properties>
-              <maven.compiler.release>21</maven.compiler.release>
-              <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-            </properties>
+              <groupId>pl.reniferek</groupId>
+              <artifactId>ServerTeleport</artifactId>
+              <version>1.0.0</version>
 
-            <repositories>
-              <repository>
-                <id>papermc</id>
-                <url>https://repo.papermc.io/repository/maven-public/</url>
-              </repository>
-            </repositories>
+              <properties>
+                  <maven.compiler.release>21</maven.compiler.release>
+                  <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+              </properties>
 
-            <dependencies>
-              <dependency>
-                <groupId>io.papermc.paper</groupId>
-                <artifactId>paper-api</artifactId>
-                <version>1.21.4-R0.1-SNAPSHOT</version>
-                <scope>provided</scope>
-              </dependency>
-            </dependencies>
+              <repositories>
+                  <repository>
+                      <id>papermc</id>
+                      <url>https://repo.papermc.io/repository/maven-public/</url>
+                  </repository>
+              </repositories>
 
-            <build>
-              <finalName>ServerTeleport</finalName>
-              <plugins>
-                <plugin>
-                  <groupId>org.apache.maven.plugins</groupId>
-                  <artifactId>maven-compiler-plugin</artifactId>
-                  <version>3.13.0</version>
-                  <configuration>
-                    <release>21</release>
-                  </configuration>
-                </plugin>
-              </plugins>
-            </build>
+              <dependencies>
+                  <dependency>
+                      <groupId>io.papermc.paper</groupId>
+                      <artifactId>paper-api</artifactId>
+                      <version>1.21.4-R0.1-SNAPSHOT</version>
+                      <scope>provided</scope>
+                  </dependency>
+              </dependencies>
+
+              <build>
+                  <plugins>
+                      <plugin>
+                          <groupId>org.apache.maven.plugins</groupId>
+                          <artifactId>maven-compiler-plugin</artifactId>
+                          <version>3.13.0</version>
+                          <configuration>
+                              <release>21</release>
+                          </configuration>
+                      </plugin>
+                  </plugins>
+              </build>
+
           </project>
           EOF
 
+      - name: Create plugin.yml
+        run: |
+          mkdir -p src/main/resources
           cat > src/main/resources/plugin.yml <<'EOF'
           name: ServerTeleport
           version: 1.0.0
@@ -89,99 +88,265 @@ jobs:
 
           permissions:
             serverteleport.reload:
+              description: Allows /stp reload
               default: op
           EOF
 
+      - name: Create config.yml
+        run: |
           cat > src/main/resources/config.yml <<'EOF'
-          # Komenda wykonywana jako gracz
-          command: "server LifeStealSMPspawn"
+          # Serwer Velocity, na który ma zostać przeniesiony gracz
+          server: "LifeStealSMPspawn"
 
-          # Wiadomosc dla gracza
-          message: "&aWYKRYTO STREFE!"
+          # Wiadomość przed przeniesieniem
+          message: "&aWYKRYTO STREFE! Przenoszenie..."
 
-          # Obszar
+          # Granice strefy
           min-x: -4
           max-x: 4
 
           min-y: 68
           max-y: 77
 
+          # Z musi być dokładnie równe tej wartości
           z: 9
 
-          # WERSJA TESTOWA:
-          # false = nie sprawdza, czy blok jest powietrzem
+          # Czy blok, w którym stoi gracz, musi być powietrzem?
           require-air: false
 
-          # Komenda tylko raz po wejściu
+          # Czy gracz ma być przenoszony tylko raz na wejście do strefy?
           once-per-entry: true
           EOF
+
+      - name: Create Java plugin
+        run: |
+          mkdir -p src/main/java/pl/reniferek/servertp
 
           cat > src/main/java/pl/reniferek/servertp/ServerTeleport.java <<'EOF'
           package pl.reniferek.servertp;
 
           import org.bukkit.ChatColor;
           import org.bukkit.Location;
-          import org.bukkit.command.Command;
-          import org.bukkit.command.CommandExecutor;
-          import org.bukkit.command.CommandSender;
           import org.bukkit.entity.Player;
           import org.bukkit.event.EventHandler;
           import org.bukkit.event.Listener;
+          import org.bukkit.event.player.PlayerJoinEvent;
           import org.bukkit.event.player.PlayerMoveEvent;
+          import org.bukkit.event.player.PlayerQuitEvent;
           import org.bukkit.plugin.java.JavaPlugin;
 
+          import java.io.ByteArrayOutputStream;
+          import java.io.DataOutputStream;
+          import java.io.IOException;
           import java.util.HashSet;
           import java.util.Set;
           import java.util.UUID;
 
-          public final class ServerTeleport extends JavaPlugin
-                  implements Listener, CommandExecutor {
+          public class ServerTeleport extends JavaPlugin implements Listener {
 
-              private final Set<UUID> playersInside = new HashSet<>();
+              private final Set<UUID> playersInRegion = new HashSet<>();
 
               @Override
               public void onEnable() {
 
                   saveDefaultConfig();
 
-                  getServer().getPluginManager()
-                          .registerEvents(this, this);
+                  // Rejestrujemy kanał BungeeCord/Velocity
+                  getServer().getMessenger().registerOutgoingPluginChannel(
+                          this,
+                          "BungeeCord"
+                  );
 
-                  if (getCommand("stp") != null) {
-                      getCommand("stp").setExecutor(this);
-                  }
+                  getServer().getPluginManager().registerEvents(this, this);
 
-                  getLogger().info("==============================");
-                  getLogger().info("ServerTeleport WLACZONY");
-                  getLogger().info("X: -4 do 4");
-                  getLogger().info("Y: 68 do 77");
-                  getLogger().info("Z: 9");
-                  getLogger().info("require-air: " +
-                          getConfig().getBoolean("require-air"));
-                  getLogger().info("==============================");
+                  getLogger().info("ServerTeleport zostal wlaczony!");
+                  getLogger().info("Plugin Messaging -> Velocity: WLACZONE");
+                  getLogger().info("Docelowy serwer: " +
+                          getConfig().getString("server"));
               }
 
               @Override
               public void onDisable() {
-                  playersInside.clear();
+
+                  getServer().getMessenger().unregisterOutgoingPluginChannel(
+                          this,
+                          "BungeeCord"
+                  );
+
+                  playersInRegion.clear();
+
+                  getLogger().info("ServerTeleport zostal wylaczony!");
               }
 
-              @Override
-              public boolean onCommand(
-                      CommandSender sender,
-                      Command command,
-                      String label,
-                      String[] args) {
+              @EventHandler
+              public void onMove(PlayerMoveEvent event) {
 
-                  if (args.length == 1 &&
-                          args[0].equalsIgnoreCase("reload")) {
+                  if (event.getTo() == null) {
+                      return;
+                  }
+
+                  Player player = event.getPlayer();
+
+                  Location to = event.getTo();
+
+                  boolean inside = isInsideRegion(player, to);
+
+                  UUID uuid = player.getUniqueId();
+
+                  if (inside) {
+
+                      boolean alreadyInside = playersInRegion.contains(uuid);
+
+                      if (getConfig().getBoolean("once-per-entry", true)
+                              && alreadyInside) {
+                          return;
+                      }
+
+                      playersInRegion.add(uuid);
+
+                      teleportPlayer(player);
+
+                  } else {
+
+                      // Gracz wyszedl ze strefy.
+                      // Przy nastepnym wejściu zostanie ponownie przeniesiony.
+                      playersInRegion.remove(uuid);
+                  }
+              }
+
+              private boolean isInsideRegion(Player player, Location location) {
+
+                  int x = location.getBlockX();
+                  int y = location.getBlockY();
+                  int z = location.getBlockZ();
+
+                  int minX = getConfig().getInt("min-x");
+                  int maxX = getConfig().getInt("max-x");
+
+                  int minY = getConfig().getInt("min-y");
+                  int maxY = getConfig().getInt("max-y");
+
+                  int requiredZ = getConfig().getInt("z");
+
+                  if (x < minX || x > maxX) {
+                      return false;
+                  }
+
+                  if (y < minY || y > maxY) {
+                      return false;
+                  }
+
+                  if (z != requiredZ) {
+                      return false;
+                  }
+
+                  if (getConfig().getBoolean("require-air", false)) {
+
+                      if (!location.getBlock().isEmpty()) {
+                          return false;
+                      }
+                  }
+
+                  return true;
+              }
+
+              private void teleportPlayer(Player player) {
+
+                  String server = getConfig().getString(
+                          "server",
+                          "LifeStealSMPspawn"
+                  );
+
+                  String message = getConfig().getString(
+                          "message",
+                          "&aWYKRYTO STREFE! Przenoszenie..."
+                  );
+
+                  player.sendMessage(
+                          ChatColor.translateAlternateColorCodes('&', message)
+                  );
+
+                  getLogger().info(
+                          "WYKRYTO STREFE: " + player.getName()
+                                  + " -> " + server
+                  );
+
+                  sendToVelocity(player, server);
+              }
+
+              private void sendToVelocity(Player player, String server) {
+
+                  try {
+
+                      ByteArrayOutputStream byteArray =
+                              new ByteArrayOutputStream();
+
+                      DataOutputStream out =
+                              new DataOutputStream(byteArray);
+
+                      // Komenda BungeeCord/Velocity:
+                      // Connect <nazwa_serwera>
+                      out.writeUTF("Connect");
+                      out.writeUTF(server);
+
+                      player.sendPluginMessage(
+                              this,
+                              "BungeeCord",
+                              byteArray.toByteArray()
+                      );
+
+                      out.close();
+                      byteArray.close();
+
+                      getLogger().info(
+                              "Wyslano Plugin Message dla "
+                                      + player.getName()
+                                      + " -> " + server
+                      );
+
+                  } catch (IOException e) {
+
+                      getLogger().severe(
+                              "Blad Plugin Messaging: "
+                                      + e.getMessage()
+                      );
+                  }
+              }
+
+              @EventHandler
+              public void onQuit(PlayerQuitEvent event) {
+                  playersInRegion.remove(
+                          event.getPlayer().getUniqueId()
+                  );
+              }
+
+              @EventHandler
+              public void onJoin(PlayerJoinEvent event) {
+                  playersInRegion.remove(
+                          event.getPlayer().getUniqueId()
+                  );
+              }
+
+              public boolean onCommand(
+                      org.bukkit.command.CommandSender sender,
+                      org.bukkit.command.Command command,
+                      String label,
+                      String[] args
+              ) {
+
+                  if (!command.getName().equalsIgnoreCase("stp")) {
+                      return false;
+                  }
+
+                  if (args.length == 1
+                          && args[0].equalsIgnoreCase("reload")) {
 
                       if (!sender.hasPermission(
                               "serverteleport.reload")) {
 
                           sender.sendMessage(
-                                  ChatColor.RED +
-                                  "Nie masz uprawnien!"
+                                  ChatColor.RED
+                                          + "Nie masz uprawnien."
                           );
 
                           return true;
@@ -189,170 +354,39 @@ jobs:
 
                       reloadConfig();
 
-                      playersInside.clear();
-
                       sender.sendMessage(
-                              ChatColor.GREEN +
-                              "ServerTeleport: config.yml " +
-                              "przeladowany!"
+                              ChatColor.GREEN
+                                      + "ServerTeleport: config.yml "
+                                      + "zostal przeladowany."
                       );
 
                       getLogger().info(
-                              "Config.yml zostal przeladowany."
+                              "Konfiguracja zostala przeladowana."
                       );
 
                       return true;
                   }
 
                   sender.sendMessage(
-                          ChatColor.YELLOW +
-                          "Uzycie: /stp reload"
+                          ChatColor.YELLOW
+                                  + "Uzycie: /stp reload"
                   );
 
                   return true;
               }
-
-              @EventHandler
-              public void onPlayerMove(PlayerMoveEvent event) {
-
-                  if (event.getTo() == null) {
-                      return;
-                  }
-
-                  Player player = event.getPlayer();
-                  Location loc = event.getTo();
-
-                  int x = loc.getBlockX();
-                  int y = loc.getBlockY();
-                  int z = loc.getBlockZ();
-
-                  boolean inArea =
-                          x >= getConfig().getInt("min-x", -4) &&
-                          x <= getConfig().getInt("max-x", 4) &&
-                          y >= getConfig().getInt("min-y", 68) &&
-                          y <= getConfig().getInt("max-y", 77) &&
-                          z == getConfig().getInt("z", 9);
-
-                  /*
-                   * TEST:
-                   * require-air jest domyslnie false.
-                   */
-                  if (getConfig().getBoolean(
-                          "require-air", false)) {
-
-                      inArea =
-                              inArea &&
-                              loc.getBlock().getType().isAir();
-                  }
-
-                  UUID uuid = player.getUniqueId();
-
-                  if (inArea) {
-
-                      if (!getConfig().getBoolean(
-                              "once-per-entry", true)
-                              || playersInside.add(uuid)) {
-
-                          getLogger().info(
-                                  "================================"
-                          );
-
-                          getLogger().info(
-                                  "WYKRYTO GRACZA: " +
-                                  player.getName()
-                          );
-
-                          getLogger().info(
-                                  "POZYCJA: " +
-                                  x + " " +
-                                  y + " " +
-                                  z
-                          );
-
-                          getLogger().info(
-                                  "WYKONUJE KOMENDE JAKO GRACZ"
-                          );
-
-                          sendMessage(player);
-                          executeCommand(player);
-
-                          getLogger().info(
-                                  "================================"
-                          );
-                      }
-
-                  } else {
-
-                      playersInside.remove(uuid);
-                  }
-              }
-
-              private void sendMessage(Player player) {
-
-                  String message =
-                          getConfig().getString(
-                                  "message",
-                                  ""
-                          );
-
-                  if (message == null ||
-                          message.trim().isEmpty()) {
-                      return;
-                  }
-
-                  player.sendMessage(
-                          ChatColor.translateAlternateColorCodes(
-                                  '&',
-                                  message
-                          )
-                  );
-              }
-
-              private void executeCommand(Player player) {
-
-                  String command =
-                          getConfig().getString(
-                                  "command",
-                                  ""
-                          );
-
-                  if (command == null ||
-                          command.trim().isEmpty()) {
-
-                      getLogger().warning(
-                              "command w config.yml jest pusta!"
-                      );
-
-                      return;
-                  }
-
-                  command = command.trim();
-
-                  if (command.startsWith("/")) {
-                      command = command.substring(1);
-                  }
-
-                  getLogger().info(
-                          "Wykonuje: /" + command +
-                          " jako " + player.getName()
-                  );
-
-                  boolean result =
-                          player.performCommand(command);
-
-                  getLogger().info(
-                          "Wynik wykonania komendy: " +
-                          result
-                  );
-              }
           }
           EOF
 
-      - name: Zbuduj plugin
-        run: mvn -B clean package
+      - name: Build
+        run: mvn clean package
 
-      - name: Przeslij JAR
+      - name: Rename JAR
+        run: |
+          mkdir -p output
+          cp target/ServerTeleport-1.0.0.jar output/ServerTeleport.jar
+
+      - name: Upload plugin
         uses: actions/upload-artifact@v4
         with:
-          name: ServerTeleport-JAR
-          path: target/ServerTeleport.jar
+          name: ServerTeleport
+          path: output/ServerTeleport.jar

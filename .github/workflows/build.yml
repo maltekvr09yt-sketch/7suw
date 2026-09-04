@@ -32,7 +32,6 @@ jobs:
           <project xmlns="http://maven.apache.org/POM/4.0.0"
                    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
                    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-
             <modelVersion>4.0.0</modelVersion>
 
             <groupId>pl.reniferek</groupId>
@@ -73,7 +72,6 @@ jobs:
                 </plugin>
               </plugins>
             </build>
-
           </project>
           EOF
 
@@ -82,14 +80,33 @@ jobs:
           version: 1.0.0
           main: pl.reniferek.servertp.ServerTeleport
           api-version: '1.21'
+
+          commands:
+            stp:
+              description: Zarzadzanie ServerTeleport
+              usage: /stp reload
+              permission: serverteleport.reload
+
+          permissions:
+            serverteleport.reload:
+              description: Pozwala przeladowac config.yml
+              default: op
           EOF
 
           cat > src/main/resources/config.yml <<'EOF'
-          # Komenda wykonywana przez gracza po wejściu w obszar.
-          # NIE wpisuj "/" na początku.
+          # ==============================
+          # ServerTeleport - konfiguracja
+          # ==============================
+
+          # Komenda wykonywana JAKO GRACZ.
+          # Nie wpisuj "/" na poczatku.
           command: "server LifeStealSMPspawn"
 
-          # Obszar teleportacji
+          # Wiadomosc wysylana graczowi.
+          # Pusta wartosc = brak wiadomosci.
+          message: "&aWykryto strefe! Przenoszenie..."
+
+          # Obszar
           min-x: -4
           max-x: 4
 
@@ -98,17 +115,21 @@ jobs:
 
           z: 9
 
-          # Czy blok, w którym znajduje się gracz, musi być powietrzem?
+          # Czy gracz musi znajdowac sie w powietrzu?
           require-air: true
 
-          # Czy komenda ma być wykonywana tylko raz przy wejściu?
+          # Komenda tylko raz przy jednym wejsciu.
           once-per-entry: true
           EOF
 
           cat > src/main/java/pl/reniferek/servertp/ServerTeleport.java <<'EOF'
           package pl.reniferek.servertp;
 
+          import org.bukkit.ChatColor;
           import org.bukkit.Location;
+          import org.bukkit.command.Command;
+          import org.bukkit.command.CommandExecutor;
+          import org.bukkit.command.CommandSender;
           import org.bukkit.entity.Player;
           import org.bukkit.event.EventHandler;
           import org.bukkit.event.Listener;
@@ -119,7 +140,8 @@ jobs:
           import java.util.Set;
           import java.util.UUID;
 
-          public final class ServerTeleport extends JavaPlugin implements Listener {
+          public final class ServerTeleport extends JavaPlugin
+                  implements Listener, CommandExecutor {
 
               private final Set<UUID> playersInside = new HashSet<>();
 
@@ -131,18 +153,66 @@ jobs:
                   getServer().getPluginManager()
                           .registerEvents(this, this);
 
-                  getLogger().info("================================");
-                  getLogger().info("ServerTeleport WLACZONY");
-                  getLogger().info("Komenda: " + getConfig().getString("command"));
-                  getLogger().info("Obszar: X -4..4");
-                  getLogger().info("Obszar: Y 68..77");
-                  getLogger().info("Obszar: Z = 9");
-                  getLogger().info("================================");
+                  if (getCommand("stp") != null) {
+                      getCommand("stp").setExecutor(this);
+                  }
+
+                  getLogger().info("ServerTeleport wlaczony!");
+                  getLogger().info(
+                          "Komenda: " +
+                          getConfig().getString("command")
+                  );
               }
 
               @Override
               public void onDisable() {
                   playersInside.clear();
+              }
+
+              @Override
+              public boolean onCommand(
+                      CommandSender sender,
+                      Command command,
+                      String label,
+                      String[] args
+              ) {
+
+                  if (args.length == 1 &&
+                          args[0].equalsIgnoreCase("reload")) {
+
+                      if (!sender.hasPermission(
+                              "serverteleport.reload")) {
+
+                          sender.sendMessage(
+                                  ChatColor.RED +
+                                  "Nie masz uprawnien."
+                          );
+
+                          return true;
+                      }
+
+                      reloadConfig();
+
+                      sender.sendMessage(
+                              ChatColor.GREEN +
+                              "ServerTeleport: config.yml " +
+                              "zostal przeladowany!"
+                      );
+
+                      getLogger().info(
+                              "Config.yml przeladowany przez " +
+                              sender.getName()
+                      );
+
+                      return true;
+                  }
+
+                  sender.sendMessage(
+                          ChatColor.YELLOW +
+                          "Uzycie: /stp reload"
+                  );
+
+                  return true;
               }
 
               @EventHandler
@@ -159,25 +229,16 @@ jobs:
                   int y = loc.getBlockY();
                   int z = loc.getBlockZ();
 
-                  int minX = getConfig().getInt("min-x");
-                  int maxX = getConfig().getInt("max-x");
-
-                  int minY = getConfig().getInt("min-y");
-                  int maxY = getConfig().getInt("max-y");
-
-                  int requiredZ = getConfig().getInt("z");
-
                   boolean inArea =
-                          x >= minX &&
-                          x <= maxX &&
-                          y >= minY &&
-                          y <= maxY &&
-                          z == requiredZ;
+                          x >= getConfig().getInt("min-x", -4) &&
+                          x <= getConfig().getInt("max-x", 4) &&
+                          y >= getConfig().getInt("min-y", 68) &&
+                          y <= getConfig().getInt("max-y", 77) &&
+                          z == getConfig().getInt("z", 9);
 
-                  boolean requireAir =
-                          getConfig().getBoolean("require-air", true);
+                  if (getConfig().getBoolean(
+                          "require-air", true)) {
 
-                  if (requireAir) {
                       inArea = inArea &&
                               loc.getBlock().getType().isAir();
                   }
@@ -186,15 +247,11 @@ jobs:
 
                   if (inArea) {
 
-                      boolean alreadyInside =
-                              playersInside.contains(uuid);
+                      if (!getConfig().getBoolean(
+                              "once-per-entry", true)
+                              || playersInside.add(uuid)) {
 
-                      if (!alreadyInside ||
-                              !getConfig().getBoolean("once-per-entry", true)) {
-
-                          playersInside.add(uuid);
-
-                          executeCommand(player);
+                          executeConfiguredCommand(player);
                       }
 
                   } else {
@@ -203,21 +260,37 @@ jobs:
                   }
               }
 
-              private void executeCommand(Player player) {
+              private void executeConfiguredCommand(
+                      Player player) {
 
-                  String command =
+                  String message =
+                          getConfig().getString("message", "");
+
+                  if (message != null &&
+                          !message.trim().isEmpty()) {
+
+                      player.sendMessage(
+                              ChatColor.translateAlternateColorCodes(
+                                      '&',
+                                      message
+                              )
+                      );
+                  }
+
+                  String configured =
                           getConfig().getString("command", "");
 
-                  if (command == null || command.trim().isEmpty()) {
+                  if (configured == null ||
+                          configured.trim().isEmpty()) {
 
                       getLogger().warning(
-                              "Komenda w config.yml jest pusta!"
+                              "command w config.yml jest pusty!"
                       );
 
                       return;
                   }
 
-                  command = command.trim();
+                  String command = configured.trim();
 
                   if (command.startsWith("/")) {
                       command = command.substring(1);
@@ -226,7 +299,7 @@ jobs:
                   getLogger().info(
                           "Gracz " +
                           player.getName() +
-                          " wszedl w obszar."
+                          " wszedl do obszaru."
                   );
 
                   getLogger().info(
@@ -240,7 +313,7 @@ jobs:
                   if (!result) {
 
                       getLogger().warning(
-                              "Komenda nie zostala wykonana poprawnie: /" +
+                              "Komenda zwrocila false: /" +
                               command
                       );
                   }

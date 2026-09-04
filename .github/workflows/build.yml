@@ -83,28 +83,21 @@ jobs:
 
           commands:
             stp:
-              description: Zarzadzanie ServerTeleport
+              description: ServerTeleport
               usage: /stp reload
               permission: serverteleport.reload
 
           permissions:
             serverteleport.reload:
-              description: Pozwala przeladowac config.yml
               default: op
           EOF
 
           cat > src/main/resources/config.yml <<'EOF'
-          # ==============================
-          # ServerTeleport - konfiguracja
-          # ==============================
-
-          # Komenda wykonywana JAKO GRACZ.
-          # Nie wpisuj "/" na poczatku.
+          # Komenda wykonywana jako gracz
           command: "server LifeStealSMPspawn"
 
-          # Wiadomosc wysylana graczowi.
-          # Pusta wartosc = brak wiadomosci.
-          message: "&aWykryto strefe! Przenoszenie..."
+          # Wiadomosc dla gracza
+          message: "&aWYKRYTO STREFE!"
 
           # Obszar
           min-x: -4
@@ -115,10 +108,11 @@ jobs:
 
           z: 9
 
-          # Czy gracz musi znajdowac sie w powietrzu?
-          require-air: true
+          # WERSJA TESTOWA:
+          # false = nie sprawdza, czy blok jest powietrzem
+          require-air: false
 
-          # Komenda tylko raz przy jednym wejsciu.
+          # Komenda tylko raz po wejściu
           once-per-entry: true
           EOF
 
@@ -157,11 +151,14 @@ jobs:
                       getCommand("stp").setExecutor(this);
                   }
 
-                  getLogger().info("ServerTeleport wlaczony!");
-                  getLogger().info(
-                          "Komenda: " +
-                          getConfig().getString("command")
-                  );
+                  getLogger().info("==============================");
+                  getLogger().info("ServerTeleport WLACZONY");
+                  getLogger().info("X: -4 do 4");
+                  getLogger().info("Y: 68 do 77");
+                  getLogger().info("Z: 9");
+                  getLogger().info("require-air: " +
+                          getConfig().getBoolean("require-air"));
+                  getLogger().info("==============================");
               }
 
               @Override
@@ -174,8 +171,7 @@ jobs:
                       CommandSender sender,
                       Command command,
                       String label,
-                      String[] args
-              ) {
+                      String[] args) {
 
                   if (args.length == 1 &&
                           args[0].equalsIgnoreCase("reload")) {
@@ -185,7 +181,7 @@ jobs:
 
                           sender.sendMessage(
                                   ChatColor.RED +
-                                  "Nie masz uprawnien."
+                                  "Nie masz uprawnien!"
                           );
 
                           return true;
@@ -193,15 +189,16 @@ jobs:
 
                       reloadConfig();
 
+                      playersInside.clear();
+
                       sender.sendMessage(
                               ChatColor.GREEN +
                               "ServerTeleport: config.yml " +
-                              "zostal przeladowany!"
+                              "przeladowany!"
                       );
 
                       getLogger().info(
-                              "Config.yml przeladowany przez " +
-                              sender.getName()
+                              "Config.yml zostal przeladowany."
                       );
 
                       return true;
@@ -236,10 +233,15 @@ jobs:
                           y <= getConfig().getInt("max-y", 77) &&
                           z == getConfig().getInt("z", 9);
 
+                  /*
+                   * TEST:
+                   * require-air jest domyslnie false.
+                   */
                   if (getConfig().getBoolean(
-                          "require-air", true)) {
+                          "require-air", false)) {
 
-                      inArea = inArea &&
+                      inArea =
+                              inArea &&
                               loc.getBlock().getType().isAir();
                   }
 
@@ -251,7 +253,32 @@ jobs:
                               "once-per-entry", true)
                               || playersInside.add(uuid)) {
 
-                          executeConfiguredCommand(player);
+                          getLogger().info(
+                                  "================================"
+                          );
+
+                          getLogger().info(
+                                  "WYKRYTO GRACZA: " +
+                                  player.getName()
+                          );
+
+                          getLogger().info(
+                                  "POZYCJA: " +
+                                  x + " " +
+                                  y + " " +
+                                  z
+                          );
+
+                          getLogger().info(
+                                  "WYKONUJE KOMENDE JAKO GRACZ"
+                          );
+
+                          sendMessage(player);
+                          executeCommand(player);
+
+                          getLogger().info(
+                                  "================================"
+                          );
                       }
 
                   } else {
@@ -260,63 +287,63 @@ jobs:
                   }
               }
 
-              private void executeConfiguredCommand(
-                      Player player) {
+              private void sendMessage(Player player) {
 
                   String message =
-                          getConfig().getString("message", "");
+                          getConfig().getString(
+                                  "message",
+                                  ""
+                          );
 
-                  if (message != null &&
-                          !message.trim().isEmpty()) {
-
-                      player.sendMessage(
-                              ChatColor.translateAlternateColorCodes(
-                                      '&',
-                                      message
-                              )
-                      );
+                  if (message == null ||
+                          message.trim().isEmpty()) {
+                      return;
                   }
 
-                  String configured =
-                          getConfig().getString("command", "");
+                  player.sendMessage(
+                          ChatColor.translateAlternateColorCodes(
+                                  '&',
+                                  message
+                          )
+                  );
+              }
 
-                  if (configured == null ||
-                          configured.trim().isEmpty()) {
+              private void executeCommand(Player player) {
+
+                  String command =
+                          getConfig().getString(
+                                  "command",
+                                  ""
+                          );
+
+                  if (command == null ||
+                          command.trim().isEmpty()) {
 
                       getLogger().warning(
-                              "command w config.yml jest pusty!"
+                              "command w config.yml jest pusta!"
                       );
 
                       return;
                   }
 
-                  String command = configured.trim();
+                  command = command.trim();
 
                   if (command.startsWith("/")) {
                       command = command.substring(1);
                   }
 
                   getLogger().info(
-                          "Gracz " +
-                          player.getName() +
-                          " wszedl do obszaru."
-                  );
-
-                  getLogger().info(
-                          "Wykonuje jako gracz: /" +
-                          command
+                          "Wykonuje: /" + command +
+                          " jako " + player.getName()
                   );
 
                   boolean result =
                           player.performCommand(command);
 
-                  if (!result) {
-
-                      getLogger().warning(
-                              "Komenda zwrocila false: /" +
-                              command
-                      );
-                  }
+                  getLogger().info(
+                          "Wynik wykonania komendy: " +
+                          result
+                  );
               }
           }
           EOF

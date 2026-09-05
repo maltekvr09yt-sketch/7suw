@@ -818,9 +818,7 @@ jobs:
 
                   @Override
                   public boolean hasPermission(Invocation invocation) {
-                      return invocation.source().hasPermission(
-                              "serverteleport.blockade"
-                      );
+                      return true;
                   }
               }
 
@@ -837,9 +835,7 @@ jobs:
 
                   @Override
                   public boolean hasPermission(Invocation invocation) {
-                      return invocation.source().hasPermission(
-                              "serverteleport.status"
-                      );
+                      return true;
                   }
               }
           }

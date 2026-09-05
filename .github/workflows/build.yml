@@ -376,7 +376,7 @@ jobs:
 
                   proxy.getCommandManager().register(
                           proxy.getCommandManager()
-                                  .metaBuilder("LifeStealSMPblokada")
+                                  .metaBuilder("blokadaLifeStealSMP")
                                   .plugin(this)
                                   .build(),
                           new BlockadeCommand()
@@ -384,7 +384,7 @@ jobs:
 
                   proxy.getCommandManager().register(
                           proxy.getCommandManager()
-                                  .metaBuilder("LifeStealSMPstatus")
+                                  .metaBuilder("statusLifeStealSMP")
                                   .plugin(this)
                                   .build(),
                           new StatusCommand()
@@ -497,13 +497,7 @@ jobs:
               }
 
               private String getStateText() {
-                  return switch (serverState) {
-                      case AKTYWNY -> "AKTYWNY";
-                      case STARTOWANY -> "STARTOWANY";
-                      case RESTARTOWANY -> "RESTARTOWANY";
-                      case STOPUJACY -> "STOPUJĄCY";
-                      case WYLACZONY -> "WYŁĄCZONY";
-                  };
+                  return serverState == ServerState.AKTYWNY ? "URUCHOMIONY" : "WYŁĄCZONY";
               }
 
               private NamedTextColor getStateColor() {
@@ -775,7 +769,7 @@ jobs:
                       if (args.length != 1) {
                           invocation.source().sendMessage(
                                   Component.text(
-                                          "Użycie: /LifeStealSMPblokada on/off"
+                                          "Użycie: /blokadaLifeStealSMP on/off"
                                   ).color(NamedTextColor.YELLOW)
                           );
                           return;
@@ -817,7 +811,7 @@ jobs:
 
                       invocation.source().sendMessage(
                               Component.text(
-                                      "Użycie: /LifeStealSMPblokada on/off"
+                                      "Użycie: /blokadaLifeStealSMP on/off"
                               ).color(NamedTextColor.YELLOW)
                       );
                   }

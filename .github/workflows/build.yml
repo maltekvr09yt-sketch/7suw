@@ -565,10 +565,10 @@ jobs:
                       serverState = ServerState.WYLACZONY;
                       player.sendMessage(
                               Component.text(
-                                      "LifeStealSMPspawn jest aktualnie WYŁĄCZONY."
+                                      "LifeStealSMP jest aktualnie wyłączony."
                               ).color(NamedTextColor.RED)
                       );
-                      playOffSound(player);
+                      playBlockedSound(player);
                       return;
                   }
 
@@ -594,19 +594,19 @@ jobs:
                       switch (serverState) {
                           case STARTOWANY ->
                                   player.sendMessage(Component.text(
-                                          "LifeStealSMPspawn jest aktualnie STARTOWANY."
+                                          "LifeStealSMP jest aktualnie startowany."
                                   ).color(NamedTextColor.YELLOW));
                           case RESTARTOWANY ->
                                   player.sendMessage(Component.text(
-                                          "LifeStealSMPspawn jest aktualnie RESTARTOWANY."
+                                          "LifeStealSMP jest aktualnie restartowany."
                                   ).color(NamedTextColor.YELLOW));
                           case STOPUJACY ->
                                   player.sendMessage(Component.text(
-                                          "LifeStealSMPspawn jest aktualnie STOPUJĄCY."
+                                          "LifeStealSMP jest aktualnie stopowany."
                                   ).color(NamedTextColor.RED));
                           case WYLACZONY ->
                                   player.sendMessage(Component.text(
-                                          "LifeStealSMPspawn jest aktualnie WYŁĄCZONY."
+                                          "LifeStealSMP jest aktualnie wyłączony."
                                   ).color(NamedTextColor.RED));
                           default -> { }
                       }
@@ -623,7 +623,7 @@ jobs:
                       serverState = ServerState.WYLACZONY;
                       player.sendMessage(
                               Component.text(
-                                      "LifeStealSMPspawn jest aktualnie WYŁĄCZONY."
+                                      "LifeStealSMP jest aktualnie wyłączony."
                               ).color(NamedTextColor.RED)
                       );
                       playOffSound(player);
@@ -719,10 +719,10 @@ jobs:
               private void playBlockedSound(Player player) {
                   player.playSound(
                           Sound.sound(
-                                  Key.key("block.note_block.bass"),
+                                  Key.key("entity.villager.no"),
                                   Sound.Source.MASTER,
-                                  0.8f,
-                                  0.7f
+                                  1.0f,
+                                  1.0f
                           )
                   );
               }
